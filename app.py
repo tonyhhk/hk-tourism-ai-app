@@ -166,7 +166,7 @@ with tab1:
                         st.warning("呢個景點已經打卡過囉！")
 
 # ==========================================
-# ✈️ Tab 2: 智能行程功能（整合地圖一鍵導航 & 碼頭智能中轉）
+# ✈️ Tab 2: 智能行程功能（已完美修復高德純文字行程規劃）
 # ==========================================
 with tab2:
     st.header("✈️ 建立你的窮遊行程")
@@ -267,24 +267,28 @@ with tab2:
         destination = processed_names[-1]
         waypoints = processed_names[1:-1]
         
-        # 修正後官方標準的 Google Maps 多站導航網址 (Directions API)
+        # 1. Google Maps 多站導航網址（完全支持純文字多起訖點、中途站搜尋）
         g_url = f"https://www.google.com/maps/dir/?api=1&origin={urllib.parse.quote(origin)}&destination={urllib.parse.quote(destination)}&waypoints={urllib.parse.quote('|'.join(waypoints))}&travelmode=transit"
         
-        # 高德地圖多站導航網址
-        a_url = f"https://uri.amap.com/navigation?to={urllib.parse.quote(destination)}&via={urllib.parse.quote(','.join(waypoints))}&mode=bus&src=UnTourist"
+        # 2. 🎯 修正後的高德地圖網址：
+        # 改用大眾 H5 端路由協議（from[name]=xxx&to[name]=yyy）強制促使高德進行純文字語義搜尋。
+        # 備註：因高德公開的外部網頁連結在「純文字模式」下無法同時解析多個 via 途經點，此處自動建立「出發站 ➔ 終點站」的直達行程，並透過下方 Tips 告知用戶。
+        a_url = f"https://www.amap.com/dir?from[name]={urllib.parse.quote(origin)}&to[name]={urllib.parse.quote(destination)}"
         
         # 保留原有的大澳小常識提示
         names_str = "".join([s["name"] for s in spots_list])
         if "大澳" in names_str:
             tips.append("🚌 **大澳地道貼士**：如不坐船，亦可於東涌站巴士總站搭乘大嶼山巴士 11 號直達大澳。")
             
+        # 增加高德純文字多站限制的貼心提示
+        tips.append("🇨🇳 **高德地圖提示**：由於高德外部網頁不支援「純文字多站插針」，已自動為您載入 **起點 ➔ 終點** 的直達路線規劃。若需沿途多站精確導航，建議優先選用左側 **Google Maps** 連結。")
+            
         return g_url, a_url, tips
 
-    # 📌 即時循環顯示每天的行程與一鍵導航按鈕（加載最新智能中轉算法）
+    # 📌 循環顯示每天的行程與一鍵導航按鈕
     for day, spots in st.session_state.itinerary.items():
         st.markdown(f"#### 📅 {day} 導航與清單")
         if spots:
-            # 呼叫最新優化的地圖網址生成器（接收回傳的貼士）
             gmaps_link, amap_link, transit_tips = generate_maps_urls(spots)
             if gmaps_link and amap_link:
                 col_map1, col_map2 = st.columns(2)
@@ -293,7 +297,7 @@ with tab2:
                 with col_map2: 
                     st.link_button(f"🇨🇳 高德地圖 一鍵導航 ({day})", amap_link, use_container_width=True, type="secondary")
                 
-                # 🔥 如果有觸發智能交通提示，用漂亮的藍色 info 方塊完美呈現
+                # 觸發智能交通提示（Info 方塊）
                 for tip in transit_tips:
                     st.info(tip)
             else:
@@ -343,7 +347,7 @@ with tab3:
             st.divider()
             
     with tab_mine:
-        st.subheader("👤 設定你的專屬虛擬人仔 (Avatar)")
+        st.subheader("👤 設定你的專專屬虛擬人仔 (Avatar)")
         
         col_avatar1, col_avatar2 = st.columns([2, 1])
         with col_avatar1:
@@ -352,10 +356,8 @@ with tab3:
             style_map = {"冒險家 (Adventurer)": "adventurer", "機械人 (Bottts)": "bottts", "像素風 (Pixel Art)": "pixel-art"}
             current_style = style_map[style_sel]
             
-            # 位置共享設定
             share_loc = st.checkbox("在公眾地圖上分享我的實時位置", value=st.session_state.user_profile["is_sharing"])
             
-        # 根據暱稱即時動態向 DiceBear 請求 SVG 圖像
         test_avatar_url = f"https://api.dicebear.com/7.x/{current_style}/svg?seed={urllib.parse.quote(current_nickname)}"
         
         with col_avatar2:
@@ -367,7 +369,6 @@ with tab3:
             st.session_state.user_profile["avatar_style"] = current_style
             st.session_state.user_profile["is_sharing"] = share_loc
             
-            # 抓取真實經緯度（如可用）
             if location and location.get('latitude'):
                 st.session_state.user_profile["lat"] = location['latitude']
                 st.session_state.user_profile["lng"] = location['longitude']
@@ -448,7 +449,6 @@ with tab4:
 with tab5:
     st.header("ℹ️ 關於 Un-Tourist 平台")
     
-    # 預設多城市數據結構
     region_data = {
         "香港": {
             "title": "香港・東方之珠", "banner_color": "linear-gradient(135deg, #1f4068, #162447)",
