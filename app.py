@@ -4,192 +4,131 @@ import folium
 from streamlit_folium import st_folium
 from folium import Popup
 import json
+import urllib.parse  # 💡 新增：用於 URL 安全編碼，防止中文景點變亂碼
 
-st.set_page_config(page_title="HK Tourism AI App", page_icon="🌏", layout="wide")
-st.title("🌏 HK Tourism AI App - Demo")
+st.set_page_config(page_title="Un-Tourist 地道窮遊導航平台", page_icon="🌏", layout="wide")
+st.title("🌏 Un-Tourist 地道窮遊導航平台 - Demo")
 st.subheader("CCMF Funding Demo | 2026")
 
-# ==================== 初始化 ====================
+# ==================== 初始化 Session State ====================
 if "itinerary" not in st.session_state:
     st.session_state.itinerary = {"Day 1": []}
 if "trip_completed" not in st.session_state:
     st.session_state.trip_completed = False
-if "packing_list" not in st.session_state:
-    st.session_state.packing_list = [
-        "護照 / 身份證明文件", "機票 / 電子機票", "現金 + 信用卡",
-        "手機 + 充電器 + 行動電源", "衣物（內衣、襪子、外套、鞋）",
-        "洗漱用品（牙刷、牙膏、洗面奶）", "藥物（常備藥、個人藥）", "雨傘 / 摺傘"
-    ]
-if "daily_list" not in st.session_state:
-    st.session_state.daily_list = [
-        "手機 + 行動電源", "錢包 / 銀包", "八達通 / 信用卡",
-        "雨傘", "紙巾 / 濕紙巾", "口罩", "充電線", "鎖匙"
-    ]
+if "stamp_collection" not in st.session_state:
+    st.session_state.stamp_collection = []
 
+# 建立 5 大核心功能 Tab
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ 地圖", "✈️ 行程", "👥 社群", "🧾 清單", "ℹ️ 關於"])
 
-# ==================== 地圖 Tab (手繪插畫風格升級) ====================
+# ==========================================
+# 🗺️ Tab 1: 地圖功能
+# ==========================================
 with tab1:
-    st.header("🗺️ 互動探索地圖")
-    st.write("配合手繪尋寶風格，按類別同地區探索香港景點")
-
+    st.header("🗺️ 手繪風尋寶地圖")
+    st.write("按類別探索香港景點，點亮專屬路線")
+    
+    # 景點數據
     data = {
         "自然": [
-            {"name": "下白泥", "coords": [22.435, 113.945], "desc": "全港最靚日落海岸。", "hours": "全日開放", "icon": "🌅"},
-            {"name": "石澳", "coords": [22.230, 114.250], "desc": "前後灘 + 情人橋。", "hours": "全日開放", "icon": "🏖️"},
-            {"name": "淺水灣", "coords": [22.236, 114.197], "desc": "著名海灘，適合游泳與放鬆。", "hours": "全日開放", "icon": "🏖️"},
-            {"name": "赤柱", "coords": [22.218, 114.213], "desc": "充滿歐陸風情的小鎮與市集。", "hours": "全日開放", "icon": "🎪"},
-            {"name": "西貢", "coords": [22.383, 114.270], "desc": "香港後花園，海鮮與地道小船。", "hours": "全日開放", "icon": "⛵"},
-            {"name": "長洲", "coords": [22.206, 114.028], "desc": "寧靜離島，必食大魚蛋同平安包。", "hours": "全日開放", "icon": "🥯"},
-            {"name": "大澳漁村", "coords": [22.254, 113.862], "desc": "東方威尼斯，獨特棚屋景觀。", "hours": "全日開放", "icon": "🛶"},
-            {"name": "萬宜水庫東壩", "coords": [22.375, 114.341], "desc": "1億4千萬年自然奇觀。", "hours": "全日開放", "icon": "🗿"},
+            {"name": "下白泥", "coords": [22.45, 113.95], "desc": "全港最靚日落海岸。", "hours": "全日開放"},
+            {"name": "石澳", "coords": [22.23, 114.25], "desc": "前後灘 + 情人橋。", "hours": "全日開放"},
+            {"name": "淺水灣", "coords": [22.23, 114.20], "desc": "著名海灘，適合游泳。", "hours": "全日開放"},
+            {"name": "西貢大浪灣", "coords": [22.38, 114.27], "desc": "著名衝浪勝地。", "hours": "全日開放"},
         ],
         "文化": [
-            {"name": "M+博物館", "coords": [22.301, 114.159], "desc": "西九文化區視覺文化博物館。", "hours": "星期三至一 10:00-18:00", "icon": "🖼️"},
-            {"name": "香港故宮", "coords": [22.302, 114.155], "desc": "展示中國古代藝術珍品。", "hours": "星期三至一 10:00-18:00", "icon": "🏺"},
-            {"name": "天壇大佛", "coords": [22.254, 113.905], "desc": "大嶼山昂坪著名戶外青銅大佛。", "hours": "每日 10:00-17:30", "icon": "🧘"},
-            {"name": "黃大仙廟", "coords": [22.342, 114.193], "desc": "香火鼎盛的著名求籤廟宇。", "hours": "每日 7:00-17:30", "icon": "🛕"},
-            {"name": "南蓮園池", "coords": [22.339, 114.204], "desc": "唐代風格的優美清幽園林。", "hours": "每日 7:00-17:00", "icon": "⛩️"},
-            {"name": "廟街夜市", "coords": [22.308, 114.170], "desc": "充滿港式大牌檔與懷舊霓虹燈。", "hours": "傍晚至凌晨", "icon": "🏮"},
-            {"name": "深水埗", "coords": [22.330, 114.162], "desc": "尋寶天堂，數碼產品與街頭小食。", "hours": "每日開放", "icon": "🔌"},
+            {"name": "天壇大佛", "coords": [22.254, 113.905], "desc": "香港最大戶外青銅佛像。", "hours": "每日 10:00-17:30"},
+            {"name": "黃大仙", "coords": [22.34, 114.19], "desc": "著名求簽廟宇。", "hours": "每日 7:00-17:30"},
+            {"name": "南蓮園池", "coords": [22.339, 114.204], "desc": "唐代風格優美園林。", "hours": "每日 7:00-17:00"},
         ],
-        "美食": [
-            {"name": "太安樓", "coords": [22.282, 114.222], "desc": "西灣河地道「深夜食堂」小食街。", "hours": "每日 12:00-24:00", "icon": "🍳"},
-            {"name": "元創方 (PMQ)", "coords": [22.283, 114.152], "desc": "前已婚警察宿舍改建的文創美食區。", "hours": "每日 07:00-23:00", "icon": "☕"},
-            {"name": "天星小輪", "coords": [22.293, 114.168], "desc": "百年歷史渡輪，飽覽維港美景。", "hours": "每日 06:30-23:30", "icon": "⛴️"},
-            {"name": "澳洲牛奶公司", "coords": [22.306, 114.171], "desc": "經典超滑炒蛋與燉奶。", "hours": "星期四至二 07:30-22:00", "icon": "🥛"},
-        ],
-        "娛樂": {
-            "尖沙咀與維港區": [
-                {"name": "尖沙咀鐘樓", "coords": [22.293, 114.169], "desc": "九廣鐵路舊車站的歷史地標。", "hours": "全日（外觀）", "icon": "🕰️"},
-                {"name": "星光大道", "coords": [22.293, 114.174], "desc": "尋找巨星手印，欣賞維港天際線。", "hours": "全日開放", "icon": "⭐"},
-                {"name": "香港摩天輪", "coords": [22.285, 114.162], "desc": "中環海濱摩天輪，浪漫夜景首選。", "hours": "每日 11:00-23:00", "icon": "🎡"},
-                {"name": "天際100", "coords": [22.303, 114.160], "desc": "全港最高室內觀景台。", "hours": "每日 10:00-20:30", "icon": "🏙️"},
-                {"name": "金紫荊廣場", "coords": [22.284, 114.174], "desc": "灣仔海濱，見證歷史的地標。", "hours": "全日開放", "icon": "🔱"},
-            ],
-            "旺角區": [
-                {"name": "旺角女人街", "coords": [22.319, 114.170], "desc": "體驗香港最密集的地道露天市集。", "hours": "每日 11:00-23:00", "icon": "🛍️"},
-            ],
-            "主題樂園與其他": [
-                {"name": "迪士尼樂園", "coords": [22.313, 114.043], "desc": "奇妙夢想城堡與童話世界。", "hours": "視乎官方季節", "icon": "🏰"},
-                {"name": "海洋公園", "coords": [22.246, 114.175], "desc": "依山而建的經典主題樂園與大熊貓。", "hours": "視乎官方季節", "icon": "🐼"},
-                {"name": "沙田馬場", "coords": [22.400, 114.205], "desc": "感受熱血沸騰的香港賽馬文化。", "hours": "賽馬日開放", "icon": "🐎"},
-                {"name": "跑馬地馬場", "coords": [22.272, 114.182], "desc": "市中心夜間賽馬與 Happy Wednesday 派對。", "hours": "週三晚間", "icon": "🐎"},
-            ]
-        }
+        "娛樂": [
+            {"name": "迪士尼樂園", "coords": [22.313, 114.043], "desc": "奇妙夢想城堡與童話世界。", "hours": "視乎官方季節"},
+            {"name": "海洋公園", "coords": [22.246, 114.175], "desc": "依山而建的經典主題樂園。", "hours": "視乎官方季節"},
+            {"name": "昂坪360", "coords": [22.255, 113.905], "desc": "世界級觀光纜車。", "hours": "每日 10:00-18:00"},
+        ]
     }
-
-    main_cat = st.selectbox("選擇類別", options=list(data.keys()), key="map_cat_selector")
-
-    if main_cat == "娛樂":
-        area = st.selectbox("選擇地區", options=list(data["娛樂"].keys()), key="map_area_selector")
-        spots = data["娛樂"][area]
-    else:
-        spots = data[main_cat]
-
-    m = folium.Map(
-        location=[22.315, 114.169],
-        zoom_start=11,
-        tiles="CartoDB Positron",
-        control_scale=True
-    )
-
+    
+    main_cat = st.selectbox("選擇類別", options=list(data.keys()))
+    spots = data[main_cat]
+    
+    # 顯示 Folium 地圖
+    m = folium.Map(location=[22.3193, 114.1694], zoom_start=11)
     for spot in spots:
         popup_html = f"""
-        <div style="background: #fff8f0; padding: 12px; border-radius: 10px; border: 2px solid #d4a017; font-family: 'Comic Sans MS', sans-serif; min-width: 200px;">
-            <b style="color:#a82c35; font-size: 1.1rem;">{spot['icon']} {spot['name']}</b><br>
-            <span style="color: #555; font-size: 0.9rem;">{spot['desc']}</span><br>
-            <small style="color: #999;"><b>🕰️ 開放：</b>{spot['hours']}</small>
+        <div style="background:white; padding:12px; border-radius:8px; min-width:200px;">
+            <b>{spot['name']}</b><br>
+            {spot['desc']}<br>
+            <small><b>開放時間：</b>{spot['hours']}</small>
         </div>
         """
-
-        icon_html = f"""
-        <div style="font-size: 28px; text-align: center; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3)); cursor: pointer;">
-            {spot['icon']}
-            <div style="font-size: 11px; background: rgba(255, 248, 240, 0.85); border: 1px solid #d4a017; border-radius: 4px; padding: 1px 4px; color: #333; font-weight: bold; white-space: nowrap; margin-top: -2px;">
-                {spot['name']}
-            </div>
-        </div>
-        """
-
         folium.Marker(
             location=spot["coords"],
-            popup=folium.Popup(popup_html, max_width=280),
-            icon=folium.DivIcon(
-                html=icon_html,
-                icon_size=(60, 60),
-                icon_anchor=(30, 30)
-            )
+            popup=Popup(popup_html, max_width=260),
+            tooltip=spot["name"]
         ).add_to(m)
-
-    st_folium(m, width="100%", height=550)
-
+    st_folium(m, width="100%", height=500)
+    
     st.markdown("---")
-
+    st.subheader("將景點加入行程或打卡")
+    
     day_options = list(st.session_state.itinerary.keys())
-    default_day = st.selectbox("選擇要加入嘅日子", options=day_options, key="default_day_map")
-
-    st.write(f"### 🗺️ {main_cat} 景點探索卡片")
-
-    for i, spot in enumerate(spots):
-        with st.expander(f"{spot['icon']} {spot['name']}"):
-            st.markdown(f"**{spot['desc']}**")
+    if not day_options:
+        day_options = ["Day 1"]
+        st.session_state.itinerary = {"Day 1": []}
+    selected_day = st.selectbox("選擇要加入嘅日子", options=day_options)
+    
+    for spot in spots:
+        with st.expander(f"{spot['name']}"):
+            st.write(spot['desc'])
             st.write(f"**開放時間**：{spot['hours']}")
-
-            if "迪士尼" in spot['name']:
-                st.markdown("🚇 **交通建議**：港鐵迪士尼綫直達")
-            elif "大佛" in spot['name'] or "寶蓮" in spot['name']:
-                st.markdown("🚠 **交通建議**：東涌站轉乘昂坪360纜車")
-            elif "海洋公園" in spot['name']:
-                st.markdown("🚇 **交通建議**：港鐵南港島綫海洋公園站")
-            elif "M+" in spot['name'] or "故宮" in spot['name']:
-                st.markdown("🚌 **交通建議**：九龍站下車步行至西九文化區")
-            else:
-                st.markdown("📍 **地點**：香港地道街區探索")
-
-            st.markdown("💡 **小貼士**：仿照手繪地圖尋寶趣，非繁忙時段造訪體驗更佳！")
-
-            st.markdown("---")
-
             col1, col2 = st.columns(2)
-
             with col1:
-                if st.button(f"加入 {default_day}", key=f"add_{main_cat}_{i}", use_container_width=True):
-                    st.session_state.itinerary[default_day].append({
-                        "name": spot['name'],
-                        "time": "12:00"
-                    })
-                    st.success(f"✅ 已將「{spot['name']}」加入 {default_day}")
-                    st.rerun()   # ← 已加入
-
+                if st.button(f"加入 {selected_day}", key=f"add_{main_cat}_{spot['name']}"):
+                    already_added = any(
+                        s["name"] == spot['name']
+                        for s in st.session_state.itinerary.get(selected_day, [])
+                    )
+                    if already_added:
+                        st.warning(f"「{spot['name']}」已經喺 {selected_day} 入面")
+                    else:
+                        if selected_day not in st.session_state.itinerary:
+                            st.session_state.itinerary[selected_day] = []
+                        st.session_state.itinerary[selected_day].append({
+                            "name": spot['name'],
+                            "time": "12:00"
+                        })
+                        st.success(f"✅ 已將「{spot['name']}」加入 {selected_day}")
             with col2:
-                if st.button("📍 蓋章打卡", key=f"stamp_{main_cat}_{i}", use_container_width=True):
-                    stamp_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+                if st.button(f"📍 蓋章打卡", key=f"stamp_{main_cat}_{spot['name']}"):
                     already = any(s["name"] == spot['name'] for s in st.session_state.stamp_collection)
                     if not already:
                         st.session_state.stamp_collection.append({
                             "name": spot['name'],
-                            "time": stamp_time
+                            "time": datetime.now().strftime("%Y-%m-%d %H:%M")
                         })
-                        st.success(f"🎉 成功在圖鑑中蓋章「{spot['name']}」！")
+                        st.success(f"🎉 成功蓋章「{spot['name']}」！")
                     else:
-                        st.warning("呢個景點你已經成功解鎖過囉！")
-# ==================== 行程 Tab ====================
+                        st.warning("呢個景點已經打卡過")
+
+# ==========================================
+# ✈️ Tab 2: 行程功能 (串聯地圖匯出核心)
+# ==========================================
 with tab2:
-    st.header("✈️ 行程管理")
-
+    st.header("✈️ 建立你的窮遊行程")
+    
     with st.expander("🔗 載入分享代碼 / 還原行程", expanded=False):
-        share_code_input = st.text_area("貼上 JSON 分享代碼", height=120)
+        share_code_input = st.text_area("貼上 JSON 分享代碼", height=100)
         if st.button("確認還原"):
-            if share_code_input:
-                try:
-                    st.session_state.itinerary = json.loads(share_code_input)
-                    st.success("✅ 行程已成功還原！")
-                    st.rerun()
-                except:
-                    st.error("❌ 分享代碼格式錯誤")
-
+            try:
+                st.session_state.itinerary = json.loads(share_code_input)
+                st.success("✅ 行程已成功還原！")
+                st.rerun()
+            except:
+                st.error("❌ 分享代碼格式錯誤")
+                
     st.markdown("---")
+    
+    # 步驟 1：選擇旅行天數
     st.subheader("步驟 1：選擇旅行天數")
     current_days = len(st.session_state.itinerary.keys())
     days = st.slider("旅行天數", 1, 7, max(3, current_days))
@@ -198,23 +137,25 @@ with tab2:
         st.session_state.itinerary = new_itinerary
         st.success(f"已成功設定 {days} 天行程！")
         st.rerun()
-
+        
     st.markdown("---")
+    
+    # 步驟 2 & 3：編排每日行程與時間
     st.subheader("步驟 2 & 3：編排每日行程與時間")
-
     if st.session_state.itinerary:
         selected_day = st.selectbox("選擇要編輯的日子", options=list(st.session_state.itinerary.keys()))
-
+        
         col_name, col_btn = st.columns([3, 1])
         with col_name:
-            custom_place = st.text_input("輸入自訂景點名稱", key="custom_place")
+            custom_place = st.text_input("輸入自訂景點名稱（例如：深水埗地鐵站、美荷樓）")
         with col_btn:
-            if st.button("手動加入"):
+            st.write("") # 調整排版高度
+            if st.button("手動加入", use_container_width=True):
                 if custom_place:
                     st.session_state.itinerary[selected_day].append({"name": custom_place, "time": "12:00"})
                     st.success(f"已加入 {custom_place}")
                     st.rerun()
-
+                    
         current_spots = st.session_state.itinerary.get(selected_day, [])
         if current_spots:
             st.write(f"#### 🕒 調整 {selected_day} 的時間安排：")
@@ -225,242 +166,332 @@ with tab2:
                     t_obj = datetime.strptime(spot["time"], "%H:%M").time()
                     new_time = st.time_input(f"時間", value=t_obj, key=f"t_{selected_day}_{idx}", label_visibility="collapsed")
                 with col_n:
-                    st.markdown(f"<b>{spot['name']}</b>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='padding-top:5px;'><b>{spot['name']}</b></div>", unsafe_allow_html=True)
                 with col_del:
                     if st.button("❌", key=f"del_{selected_day}_{idx}"):
                         current_spots.pop(idx)
                         st.session_state.itinerary[selected_day] = current_spots
                         st.rerun()
                 updated_spots.append({"name": spot["name"], "time": new_time.strftime("%H:%M")})
-
             updated_spots.sort(key=lambda x: x["time"])
             st.session_state.itinerary[selected_day] = updated_spots
         else:
             st.info("這一天目前還沒有安排景點")
-
+            
     st.markdown("---")
-    st.subheader("步驟 4：完成並匯出行程")
-    if st.button("生成完整行程清單"):
-        st.session_state.trip_completed = True
+    
+    # 🎯 核心串聯優化：步驟 4：完成並匯出行程 (動態地圖跳轉邏輯)
+    st.subheader("🎉 步驟 4：完成並匯出行程")
+    
+    # 🛠️ 定義多系統地圖 Deep Link 生成函數
+    def generate_maps_urls(spots_list):
+        if len(spots_list) < 2:
+            return None, None
+            
+        # 提取經時間排序後的純景點文字清單
+        names = [s["name"] for s in spots_list]
+        origin = names[0]
+        destination = names[-1]
+        waypoints = names[1:-1]
+        
+        # 1. Google Maps 官方標準跨平台 Deep Link 格式
+        encoded_origin = urllib.parse.quote(origin)
+        encoded_destination = urllib.parse.quote(destination)
+        encoded_waypoints = urllib.parse.quote("|".join(waypoints))
+        gmaps_url = f"https://www.google.com/maps/dir/?api=1&origin={encoded_origin}&destination={encoded_destination}&waypoints={encoded_waypoints}&travelmode=transit"
+        
+        # 2. 高德地圖官方跨平台導航跳轉格式 (適合內地旅客環境)
+        encoded_amap_dest = urllib.parse.quote(destination)
+        encoded_amap_via = urllib.parse.quote(",".join(waypoints)) # 高德中途站用逗號分隔
+        amap_url = f"https://uri.amap.com/navigation?to={encoded_amap_dest}&via={encoded_amap_via}&mode=bus&src=UnTourist"
+        
+        return gmaps_url, amap_url
 
+    if st.button("生成完整行程清單及導航連結", type="primary", use_container_width=True):
+        st.session_state.trip_completed = True
+        
     if st.session_state.trip_completed:
         st.markdown("### 📋 您的最終行程表")
+        
         for day, spots in st.session_state.itinerary.items():
             st.markdown(f"#### 📅 {day}")
-            for spot in spots:
-                t_pretty = datetime.strptime(spot["time"], "%H:%M").strftime("%I:%M %p")
-                st.write(f"- **{t_pretty}** : {spot['name']}")
+            
+            if spots:
+                # 📢 動態計算並渲染該天行程的地圖跳轉按鈕
+                gmaps_link, amap_link = generate_maps_urls(spots)
+                
+                if gmaps_link and amap_link:
+                    col_map1, col_map2 = st.columns(2)
+                    with col_map1:
+                        st.link_button(f"🗺️ 一鍵貼上 Google Maps 導航 ({day})", gmaps_link, use_container_width=True)
+                    with col_map2:
+                        st.link_button(f"🇨🇳 一鍵貼上 高德地圖 導航 ({day})", amap_link, use_container_width=True)
+                else:
+                    st.caption("💡 提示：該天景點數量需大於或等於 2 個，方可啟用一鍵地圖導航功能。")
+                
+                # 印出景點時間軸
+                for spot in spots:
+                    t_pretty = datetime.strptime(spot["time"], "%H:%M").strftime("%I:%M %p")
+                    st.write(f"- **{t_pretty}** : {spot['name']}")
+            else:
+                st.write("*此日期目前未有編排行程*")
             st.write("")
-
+            
+        st.divider()
         col_pic, col_code = st.columns(2)
         with col_pic:
-            if st.button("🖼️ 截圖分享說明"):
-                st.info("使用 Win + Shift + S 或 Cmd + Shift + 4 進行截圖")
+            if st.button("🖼️ 截圖分享說明", use_container_width=True):
+                st.info("使用 Win + Shift + S 或 Cmd + Shift + 4 進行屏幕截圖")
         with col_code:
-            if st.button("🔗 生成分享代碼"):
+            if st.button("🔗 生成分享代碼", use_container_width=True):
                 st.code(json.dumps(st.session_state.itinerary, ensure_ascii=False, indent=2), language="json")
 
-# ==================== 社群 Tab ====================
+# ==========================================
+# 👥 Tab 3: 社群功能
+# ==========================================
 with tab3:
     st.header("👥 社群")
-    st.info("【CCMF 未來規劃】用戶可以一鍵公開自己的 JSON 行程至社群，其他旅客能進行點讚、收藏並直接複製行程。")
+    tab_hot, tab_mine, tab_region = st.tabs(["🔥 熱門路線", "👤 我的帳戶", "🌍 挑選地區"])
+    
+    with tab_hot:
+        st.subheader("🔥 全球熱門路線 (用戶訂閱優先出現)")
+        hot_routes = [
+            {
+                "user": "KOL_香港旅遊",
+                "title": "5日4夜香港離島深度遊",
+                "desc": "長洲 + 大澳 + 坪洲",
+                "days": 5,
+                "places": 5,
+                "slots": {
+                    "Day 1": [{"name": "長洲大魚蛋", "time": "12:00"}, {"name": "長洲張保仔洞", "time": "15:00"}],
+                    "Day 2": [{"name": "大澳漁村棚屋", "time": "11:00"}, {"name": "大澳文物酒店下午茶", "time": "15:30"}],
+                    "Day 3": [{"name": "坪洲秘密花園", "time": "14:00"}],
+                    "Day 4": [{"name": "昂坪360纜車", "time": "10:30"}],
+                    "Day 5": [{"name": "東涌小炮台", "time": "13:00"}]
+                }
+            },
+            {
+                "user": "日本自由行達人",
+                "title": "東京+京都7日經典路線",
+                "desc": "必去景點 + 隱藏美食",
+                "days": 7,
+                "places": 7,
+                "slots": {
+                    "Day 1": [{"name": "東京雷門淺草寺", "time": "10:00"}],
+                    "Day 2": [{"name": "SHIBUYA SKY 展望台", "time": "17:30"}],
+                    "Day 3": [{"name": "京都清水寺", "time": "09:00"}],
+                    "Day 4": [{"name": "伏見稻荷大社", "time": "14:00"}],
+                    "Day 5": [{"name": "金閣寺", "time": "11:00"}],
+                    "Day 6": [{"name": "嵐山竹林小徑", "time": "15:00"}],
+                    "Day 7": [{"name": "關西機場免稅店", "time": "16:00"}]
+                }
+            },
+        ]
+        for route in hot_routes:
+            st.markdown(f"**{route['title']}**")
+            st.caption(f"by {route['user']} · {route['days']}日")
+            st.write(route['desc'])
+            col1, col2, col3 = st.columns(3)
+            with col1: st.button("👍 讚", key=f"like_{route['title']}")
+            with col2: st.button("⭐ 收藏", key=f"save_{route['title']}")
+            with col3:
+                if st.button("➕ 一鍵導入行程", key=f"add_{route['title']}", type="primary"):
+                    st.session_state.itinerary = route["slots"].copy()
+                    st.session_state.trip_completed = True
+                    st.success(f"🎉 成功匯入整條「{route['title']}」！請即前往「✈️ 行程」查看完整規劃與導航連結。")
+            st.divider()
+            
+    with tab_mine:
+        st.subheader("👤 我的帳戶")
+        sub1, sub2, sub3 = st.tabs(["我分享的", "我收藏的", "我讚過的"])
+        with sub1: st.info("暫無數據")
+        with sub2: st.info("暫無數據")
+        with sub3: st.info("暫無數據")
+        
+    with tab_region:
+        st.subheader("🌍 挑選地區")
+        region = st.selectbox("選擇地區", ["香港", "日本", "台灣"])
+        st.write(f"以下係 {region} 熱門路線（Demo）")
 
-# ==================== 清單 Tab ====================
+# ==========================================
+# 🧾 Tab 4: 清單與打卡圖鑑
+# ==========================================
 with tab4:
-    st.header("🧾 清單")
+    if "packing_list" not in st.session_state:
+        st.session_state.packing_list = ["護照 / 身份證明文件", "機票 / 電子機票", "現金 + 信用卡", "手機 + 充電器 + 行動電源", "衣物（內衣、襪子、外套、鞋）", "洗漱用品", "藥物（常備藥）", "雨傘 / 摺傘"]
+    if "daily_list" not in st.session_state:
+        st.session_state.daily_list = ["手機 + 行動電源", "錢包 / 銀包", "八達通 / 信用卡", "雨傘", "紙巾 / 濕紙巾", "口罩", "充電線", "鎖匙"]
 
-    # 四個分頁
-    tab_pack, tab_daily, tab_app, tab_stamp = st.tabs([
-        "🧳 行李清單", 
-        "👜 日常必備", 
-        "📱 必備 Apps", 
-        "📍 我的打卡"
-    ])
-
-    # ========== 1. 行李清單 ==========
+    st.header("🧾 旅遊清單與小貼士")
+    st.write("出發前同每日行程準備，確保旅程萬無一失")
+    
+    st.markdown("""
+        <style>
+        .custom-card { background-color: #ffffff; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eef2f6; }
+        .tips-card { background-color: #e8f4fd; padding: 20px; border-radius: 16px; border-left: 5px solid #3b82f6; margin-bottom: 20px; }
+        .stamp-badge { background: linear-gradient(135deg, #fffaf0, #fff8f0); border: 2px dashed #d4a017; padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 10px; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    tab_pack, tab_daily, tab_app, tab_stamp = st.tabs(["🧳 行李清單", "👜 日常必備", "📱 必備 Apps", "🏆 我的打卡圖鑑"])
+    
     with tab_pack:
-        st.subheader("🧳 行李清單")
-
-        if "packing_list" not in st.session_state:
-            st.session_state.packing_list = [
-                "護照 / 身份證明文件", "機票 / 電子機票", "現金 + 信用卡",
-                "手機 + 充電器 + 行動電源", "衣物（內衣、襪子、外套、鞋）",
-                "洗漱用品", "藥物（常備藥）", "雨傘 / 摺傘"
-            ]
-
+        st.subheader("🧳 出發前行李檢查")
         total = len(st.session_state.packing_list)
         checked = sum(1 for i in range(total) if st.session_state.get(f"pack_check_{i}", False))
         st.progress(checked / total if total > 0 else 0)
-        st.caption(f"已完成 {checked} / {total}")
-
+        st.caption(f"📊 整備進度：已完成 {checked} / {total}")
+        
+        st.markdown('<div class="custom-card">', unsafe_allow_html=True)
         for i, item in enumerate(st.session_state.packing_list):
             col1, col2 = st.columns([10, 1])
-            with col1:
-                st.checkbox(item, key=f"pack_check_{i}")
+            with col1: st.checkbox(item, key=f"pack_check_{i}")
             with col2:
                 if st.button("❌", key=f"del_pack_{i}"):
                     st.session_state.packing_list.pop(i)
                     st.rerun()
-
-        new_item = st.text_input("新增行李項目", key="new_pack")
-        if st.button("加入行李清單", key="add_pack"):
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        new_item = st.text_input("➕ 新增自訂行李項目", key="new_pack")
+        if st.button("加入行李清單", key="add_pack", use_container_width=True):
             if new_item:
                 st.session_state.packing_list.append(new_item)
-                st.success(f"已加入：{new_item}")
                 st.rerun()
-
-    # ========== 2. 日常必備 ==========
+                
     with tab_daily:
-        st.subheader("👜 日常必備")
-
-        if "daily_list" not in st.session_state:
-            st.session_state.daily_list = [
-                "手機 + 行動電源", "錢包 / 銀包", "八達通 / 信用卡",
-                "雨傘", "紙巾 / 濕紙巾", "口罩", "充電線", "鎖匙"
-            ]
-
+        st.subheader("👜 每日出門隨身必備")
         total_d = len(st.session_state.daily_list)
         checked_d = sum(1 for i in range(total_d) if st.session_state.get(f"daily_check_{i}", False))
         st.progress(checked_d / total_d if total_d > 0 else 0)
-        st.caption(f"已完成 {checked_d} / {total_d}")
-
+        st.caption(f"📊 今日出門進度：已完成 {checked_d} / {total_d}")
+        
+        st.markdown('<div class="custom-card">', unsafe_allow_html=True)
         for i, item in enumerate(st.session_state.daily_list):
             col1, col2 = st.columns([10, 1])
-            with col1:
-                st.checkbox(item, key=f"daily_check_{i}")
+            with col1: st.checkbox(item, key=f"daily_check_{i}")
             with col2:
                 if st.button("❌", key=f"del_daily_{i}"):
                     st.session_state.daily_list.pop(i)
                     st.rerun()
-
-        new_daily = st.text_input("新增日常項目", key="new_daily")
-        if st.button("加入日常清單", key="add_daily"):
-            if new_daily:
-                st.session_state.daily_list.append(new_daily)
-                st.success(f"已加入：{new_daily}")
-                st.rerun()
-
-    # ========== 3. 必備 Apps ==========
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="tips-card">
+            <h4>💡 旅客實用小貼士</h4>
+            <ul style="padding-left: 20px; color: #333333; line-height: 1.8;">
+                <li><b>八達通卡</b>可在機場或地鐵站購買，押金 HK$50。</li>
+                <li>香港室內<b>冷氣極強</b>，建議隨身攜帶薄外套。</li>
+                <li>香港為免稅港，全港購物均<b>免消費稅</b>。</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
     with tab_app:
-        st.subheader("📱 必備 Apps")
+        st.subheader("📱 推薦下載官方實用 Apps")
         apps = [
-            ("八達通 App", "交通、便利店、超市支付"),
-            ("Klook", "門票、體驗、景點預訂"),
-            ("Trip.com", "機票、酒店、火車票"),
-            ("Google Maps", "地圖導航、交通資訊"),
-            ("Citymapper / Moovit", "香港公共交通路線規劃"),
-            ("PayMe / AlipayHK", "電子支付"),
+            ("八達通 App", "交通乘車、便利店電子支付與餘額查詢", "💳"),
+            ("Citymapper", "香港最準確的公共交通路線規劃與實時到站時間", "🚇"),
+            ("OpenRice 開飯喇", "香港最強搵食搵餐廳、睇食評與訂座神器", "🍛"),
         ]
-        for name, desc in apps:
-            with st.expander(f"📲 {name}"):
+        for name, desc, app_emoji in apps:
+            with st.expander(f"{app_emoji} {name}"):
                 st.write(desc)
-        st.info("💡 建議出發前下載並登入相關 App")
-
-          # ========== 4. 我的打卡（尋寶風格 + 卡片） ==========
+                
     with tab_stamp:
-        st.subheader("📍 香港景點尋寶進度")
-
-        if "stamp_collection" not in st.session_state:
-            st.session_state.stamp_collection = []
-
+        st.subheader("🏆 香港手繪尋寶打卡圖鑑")
         total_collected = len(st.session_state.stamp_collection)
-
-        # 進度條
-        progress = min(total_collected / 10, 1.0)
-        st.progress(progress)
-        st.caption(f"已打卡 **{total_collected}** 個景點 ｜ 目標：10 個")
-
+        st.progress(min(total_collected / 10, 1.0))
+        st.caption(f"🎯 已解鎖 **{total_collected}** / 10 個手繪景點標記")
+        
         if total_collected > 0:
-            st.markdown("### 🏆 已收集景點")
-
+            cols = st.columns(2)
             for i, item in enumerate(st.session_state.stamp_collection):
-                # 簡單 emoji 對應（可之後擴充）
-                emoji = "📍"
-                name = item['name']
-                if "天壇大佛" in name or "大佛" in name:
-                    emoji = "🗿"
-                elif "迪士尼" in name:
-                    emoji = "🏰"
-                elif "天星小輪" in name or "小輪" in name:
-                    emoji = "⛴️"
-                elif "鐘樓" in name:
-                    emoji = "🕰️"
-                elif "摩天輪" in name:
-                    emoji = "🎡"
-                elif "海洋公園" in name:
-                    emoji = "🐬"
-                elif "山頂" in name or "纜車" in name:
-                    emoji = "🚠"
-                elif "LKF" in name or "蘭桂坊" in name:
-                    emoji = "🍸"
-                elif "女人街" in name:
-                    emoji = "🛍️"
-
-                with st.container():
-                    col1, col2 = st.columns([9, 2])
-                    with col1:
-                        st.markdown(f"### {emoji} {name}")
-                        st.caption(f"打卡時間：{item['time']}")
-                    with col2:
-                        if st.button("刪除", key=f"del_stamp_{i}"):
-                            st.session_state.stamp_collection.pop(i)
-                            st.rerun()
-
-            st.markdown("---")
-
-            if total_collected >= 5:
-                st.success("🎉 太棒了！你已經收集咗 5 個以上景點！繼續探索香港～")
-            else:
-                st.info("繼續去地圖打卡更多景點，解鎖更多驚喜吧！")
-
+                current_col = cols[i % 2]
+                with current_col:
+                    st.markdown(f"""
+                    <div class="stamp-badge">
+                        <span style="font-size: 2.5rem;">📍</span>
+                        <h4 style="margin: 5px 0; color: #a82c35;">{item['name']}</h4>
+                        <small style="color: #777;">✨ 已解鎖<br>{item['time']}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button("撤銷蓋章", key=f"del_stamp_{i}", use_container_width=True):
+                        st.session_state.stamp_collection.pop(i)
+                        st.rerun()
         else:
-            st.info("你仲未有打卡記錄！\n去地圖 Tab 加入景點時可以一併打卡～")
+            st.info("🧭 快去「🗺️ 地圖」探索香港景點並點擊【📍 蓋章打卡】來點亮圖鑑吧！")
 
-# ==================== 關於 Tab ====================
-# ==================== 關於 Tab (全新升級版) ====================
+# ==========================================
+# ℹ️ Tab 5: 關於 / 城市切換功能
+# ==========================================
 with tab5:
-    st.header("ℹ️ 關於")
-
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 25px; border-radius: 15px; color: white; text-align: center; margin-bottom: 20px;">
-        <h2 style="margin:0;">香港旅遊 AI App</h2>
-        <p style="margin:8px 0 0 0; opacity:0.9;">探索香港，留住美好時光</p>
+    st.header("ℹ️ 關於 Un-Tourist")
+    try:
+        from streamlit_geolocation import streamlit_geolocation
+        col_gps, _ = st.columns([1, 4])
+        with col_gps:
+            st.caption("自動定位切換地區：")
+            location = streamlit_geolocation()
+    except:
+        location = None
+        
+    region_data = {
+        "香港": {
+            "title": "香港・東方之珠", "subtitle": "Pearl of the Orient", "banner_color": "linear-gradient(135deg, #1f4068, #162447)",
+            "lang": "粵語、英語、普通話", "currency": "港幣 (HKD)", "timezone": "UTC+8", "voltage": "220V (英式3腳)", "emergency": "999", "inquiry": "2508 1234",
+            "michelin": "🎵 2026最新：香港街頭小食及多間中菜廳蟬聯米芝蓮三星！太安樓亦有平價美食上榜。",
+            "warnings": ["禁煙區違例定額罰款 $1,500。", "嚴禁攜帶電子煙、加熱煙入境。", "攜帶生肉或蛋類入境屬違法行為。"]
+        },
+        "新加坡": {
+            "title": "新加坡・獅城活力", "subtitle": "The Garden City", "banner_color": "linear-gradient(135deg, #a82c35, #6c1a20)",
+            "lang": "英語、馬來語、華語", "currency": "新加坡元 (SGD)", "timezone": "UTC+8", "voltage": "230V (英式3腳)", "emergency": "999 / 995", "inquiry": "+65 6736 2000",
+            "michelin": "🎵 2026最新：麥士威熟食中心多間傳統檔位新入選必比登推介！",
+            "warnings": ["嚴禁攜帶口香糖入境販售。", "亂丟垃圾、隨地吐痰面臨高額罰款。", "地鐵站內及車廂內嚴禁飲食。"]
+        }
+    }
+    
+    default_idx = 0
+    if location and location.get('latitude'):
+        if 1.0 <= location['latitude'] <= 1.5:
+            default_idx = 1
+            
+    if "current_region" not in st.session_state:
+        st.session_state.current_region = list(region_data.keys())[default_idx]
+        
+    @st.dialog("🌐 更改探索地區 / 查看地球儀")
+    def change_region_dialog():
+        st.write("請選擇您想查看的旅遊城市：")
+        chosen = st.selectbox("地區選擇", options=list(region_data.keys()), index=list(region_data.keys()).index(st.session_state.current_region))
+        st.info("🔮 提示：未來版本此處將會展示 3D 旋轉地球儀！")
+        if st.button("確認切換", use_container_width=True):
+            st.session_state.current_region = chosen
+            st.rerun()
+            
+    current_city = st.session_state.current_region
+    info = region_data[current_city]
+    
+    banner_html = f"""
+    <div style="background: {info['banner_color']}; padding: 40px 30px; border-radius: 15px; color: white; text-align: center; margin-bottom: 25px;">
+        <h1 style="color: white; margin: 0; font-size: 2.2rem; font-weight: 700;">{info['title']}</h1>
+        <p style="margin: 5px 0 0 0; font-style: italic; opacity: 0.8;">{info['subtitle']}</p>
     </div>
-    """, unsafe_allow_html=True)
-
-    st.subheader("📱 項目簡介")
-    st.write("""
-    **HK Tourism AI App** 係一個專為來港旅客設計嘅智慧旅遊工具。
-    透過互動地圖、個人化行程規劃同打卡收藏功能，幫助旅客輕鬆探索香港更多元化嘅景點，
-    同時為本地中小企帶來更多客流機會。
-    """)
-
-    st.markdown("---")
-
-    st.subheader("🇭🇰 香港基本資訊")
+    """
+    st.markdown(banner_html, unsafe_allow_html=True)
+    
+    if st.button(f"🌐 更改地區 (目前：{current_city})", use_container_width=True):
+        change_region_dialog()
+        
+    st.markdown(f"### 🧳 {current_city} 基本資訊")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**🗣️ 語言**<br>粵語、英語、普通話", unsafe_allow_html=True)
-        st.write("")
-        st.markdown("**🕒 時區**<br>UTC+8（香港時間）", unsafe_allow_html=True)
-        st.write("")
-        st.markdown("**🚨 緊急電話**<br><span style='color:red;'>999（警察/救護/消防）</span>", unsafe_allow_html=True)
+        st.markdown(f"**🗣️ 語言**<br>{info['lang']}", unsafe_allow_html=True)
+        st.markdown(f"**🚨 緊急電話**<br><span style='color:red;'>{info['emergency']}</span>", unsafe_allow_html=True)
     with c2:
-        st.markdown("**💰 貨幣**<br>港幣 (HKD)", unsafe_allow_html=True)
-        st.write("")
-        st.markdown("**🔌 電壓**<br>220V / 50Hz（英式3腳）", unsafe_allow_html=True)
-        st.write("")
-        st.markdown("**📞 旅遊查詢**<br>2508 1234（旅發局）", unsafe_allow_html=True)
-
+        st.markdown(f"**💰 貨幣**<br>{info['currency']}", unsafe_allow_html=True)
+        st.markdown(f"**📞 旅遊查詢**<br>{info['inquiry']}", unsafe_allow_html=True)
+        
     st.markdown("---")
-
-    st.subheader("💡 旅遊小貼士")
-    st.markdown("""
-    - 香港為免稅港，全港購物均**免消費稅**，**無需辦理退稅**
-    - 八達通可在機場、地鐵站、便利店購買
-    - 建議下載「香港出行易」App 查交通
-    - 大型商場有退稅服務（只限非香港居民）
-    """)
-
-    st.markdown("---")
-    st.caption("本 App 由 Tony Ho（何浩強）開發 ｜ CCMF Funding Demo 2026")
+    st.info(info['michelin'])
+    st.warning(f"前往{current_city}前請特別注意出入境禁忌與法規：")
+    for warning in info['warnings']:
+        st.markdown(f"* {warning}")
