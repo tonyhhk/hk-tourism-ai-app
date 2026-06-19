@@ -75,97 +75,334 @@ except:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ 實時社交地圖", "✈️ 智能行程", "👥 窮遊社群", "🧾 清單小貼士", "ℹ️ 關於平台"])
 
 # ==========================================
-# 🗺️ Tab 1: 實時尋寶地圖 (全新 H5 畫布絲滑行路版)
+# 🗺️ Tab 1: 實時尋寶地圖 (純JS零閃爍、原地彈窗、全功能保留版)
 # ==========================================
 with tab1:
     st.header("🗺️ 手繪風動態尋寶地圖")
-    st.write("點擊下方景點按鈕，你的人仔就會在手繪圖畫布上絲滑前進！")
+    st.write("直接點擊地圖上的自訂圖標，即可在原地彈出詳細攻略卡片，與行程、打卡功能完美連動！")
 
     # ----------------------------------------
-    # 📌 定義手繪地圖上各個地標的坐標百分比 (X, Y)
-    # （對應你張手繪圖，你可以自己調整數值）
+    # 📌 1. 擴充核心數據庫：精準對應正方形地圖百分比坐標 (x, y)
     # ----------------------------------------
     LANDMARKS = {
-        "中環 (Central)": {"x": 52, "y": 66},
-        "長洲 (Cheung Chau)": {"x": 30, "y": 80},
-        "大澳漁村 (Tai O)": {"x": 9, "y": 65},
-        "天壇大佛 (Big Buddha)": {"x": 24, "y": 50},
-        "迪士尼樂園 (Disneyland)": {"x": 32, "y": 40},
-        "旺角 (Mong Kok)": {"x": 56, "y": 40},
-        "黃大仙廟 (Wong Tai Sin)": {"x": 70, "y": 30},
-        "西貢 (Sai Kung)": {"x": 86, "y": 26}
+        "大澳漁村": {
+            "x": 13, "y": 66, "category": "自然", "icon": "🛶", "eng": "Tai O Fishing Village",
+            "time": "全天開放 (店舖多營業 10:00-18:00)", "transport": "🚌 於東涌站乘搭 11 號巴士",
+            "tips": "建議坐舢舨小艇尋找白海豚，回程試試大澳沙翁！",
+            "desc": "參觀香港獨特的水上棚屋，感受遠離繁囂的傳統漁村風情。"
+        },
+        "天壇大佛": {
+            "x": 24, "y": 50, "category": "文化", "icon": "⛰️", "eng": "Big Buddha",
+            "time": "10:00-17:30", "transport": "🚡 昂坪360纜車 / 23號巴士",
+            "tips": "需要挑戰 268 級石階，參觀前記得準備好腳力！",
+            "desc": "全球最高的戶外青銅坐佛，巍峨肅穆，是洗滌心靈的文化勝地。"
+        },
+        "海洋公園": {
+            "x": 68, "y": 78, "category": "美食", "icon": "🐼", "eng": "Ocean Park · 香港島",
+            "time": "10:00-19:00 (週末至20:00)", "transport": "🚇 地鐵海洋公園站",
+            "tips": "建議購買網上優惠票，避開週末人潮",
+            "desc": "世界級主題公園，擁有大熊貓、海洋生物及機動遊戲。"
+        },
+        "西貢市中心": {
+            "x": 84, "y": 25, "category": "自然", "icon": "⚓", "eng": "Sai Kung Town",
+            "time": "全天開放 (海鮮街多營業至 22:00)", "transport": "🚌 彩虹站乘 1A 綠色小巴",
+            "tips": "可以在碼頭直接租街渡前往半月灣或橋咀島玩水！",
+            "desc": "香港後花園，擁有風光如畫的海景與新鮮生猛的避風塘海鮮街。"
+        },
+        "黃大仙廟": {
+            "x": 68, "y": 29, "category": "文化", "icon": "🙏", "eng": "Wong Tai Sin Temple",
+            "time": "07:30-16:30", "transport": "🚇 觀塘綫 · 黃大仙站 B2 出口",
+            "tips": "廟宇內香火鼎盛，求籤非常靈驗，記得保持誠心。",
+            "desc": "香港著名祠廟，建築金碧輝煌，崇奉儒、釋、道三教，有求伴應。"
+        },
+        "九龍半島": {
+            "x": 67, "y": 55, "category": "購物", "icon": "🛍️", "eng": "Kowloon Peninsula",
+            "time": "11:00-23:00", "transport": "🚇 荃灣綫/觀塘綫 · 旺角站 E2 出口",
+            "tips": "漫步女人街與波鞋街，感受地道香港霓虹夜景。",
+            "desc": "香港最熱鬧的街區之一，充滿地道霓虹氣息與各式特色小攤檔。"
+        },
+        "長洲": {
+            "x": 30, "y": 80, "category": "美食", "icon": "🍢", "eng": "Cheung Chau Island",
+            "time": "渡輪全天候運營", "transport": "🚢 中環 5 號碼頭乘搭渡輪直達",
+            "tips": "必食塊頭超大的巨型咖哩魚蛋、糯米糍與香脆炸鮮奶！",
+            "desc": "充滿活力的小島，行山、睇日落、踩單車，仲可以參觀張保仔洞。"
+        },
+        "南丫島": {
+            "x": 46, "y": 91, "category": "自然", "icon": "🐟", "eng": "Lamma Island",
+            "time": "渡輪全天候運營", "transport": "🚢 中環 4 號碼頭乘搭渡輪直達",
+            "tips": "感受索罟灣漁村風情，享受悠閒嘅海鮮與行山之旅。",
+            "desc": "充滿異國風情與中西交融的小島，島上步伐悠閒，海鮮十分出名。"
+        }
     }
 
-    # 初始化人仔位置 (預設在中環)
-    if "current_loc" not in st.session_state:
-        st.session_state.current_loc = "中環 (Central)"
+    # ----------------------------------------
+    # 🔍 2. 景點類別篩選 (頂部保留，數據同步過濾)
+    # ----------------------------------------
+    category_list = ["全部", "自然", "文化", "購物", "美食"]
+    selected_cat = st.selectbox("🎯 篩選地圖景點類別", category_list)
+
+    # 🛠️ 3. 處理來自 HTML 的隱藏交互（用來在不重整網頁下將行程和打卡數據塞回 Streamlit）
+    # 建立兩個隱藏的按鈕和輸入框，供 JavaScript 在底層觸發 Python 邏輯
+    if "action_trigger" not in st.session_state:
+        st.session_state.action_trigger = ""
+    if "action_place" not in st.session_state:
+        st.session_state.action_place = ""
+
+    # 使用 Streamlit 隱藏組件接收前端 JS 傳過來的打卡同加入行程指令
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        js_action = st.text_input("js_action", value="", key="js_act", label_visibility="collapsed")
+    with cc2:
+        js_place = st.text_input("js_place", value="", key="js_plc", label_visibility="collapsed")
+
+    # 當檢測到 JS 傳值時，執行原有功能，絕不刪減！
+    if js_action and js_place:
+        if js_action == "add":
+            if "Day 1" not in st.session_state.itinerary:
+                st.session_state.itinerary["Day 1"] = []
+            if not any(item["landmark"] == js_place for item in st.session_state.itinerary["Day 1"]):
+                st.session_state.itinerary["Day 1"].append({
+                    "time": "隨選時段",
+                    "landmark": js_place,
+                    "desc": LANDMARKS.get(js_place, {}).get("desc", "")
+                })
+                st.toast(f"📅 已將「{js_place}」同步加入 Day 1 行程表！", icon="✅")
+            else:
+                st.toast(f"👀 「{js_place}」已經喺行程表入面喇！")
+        elif js_action == "stamp":
+            if js_place not in st.session_state.stamp_collection:
+                st.session_state.stamp_collection.append(js_place)
+                st.balloons()
+                st.toast(f"🏅 打卡成功！解鎖「{js_place}」徽章！", icon="🎉")
+            else:
+                st.toast(f"🐾 你之前已經收集過「{js_place}」的足跡囉！")
+        
+        # 執行完即時重設，防止循環觸發
+        st.write("<script>window.parent.document.querySelectorAll('input[aria-label=\"js_action\"], input[aria-label=\"js_place\"]').forEach(i => {i.value = ''; i.dispatchEvent(new Event('input', {bubbles:true}))});</script>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 3. 讓用戶點擊按鈕切換目的地
+    # 🏃‍♂️ 4. 準備人仔頭像數據
     # ----------------------------------------
-    col_btns = st.columns(4)
-    for idx, place in enumerate(LANDMARKS.keys()):
-        with col_btns[idx % 4]:
-            if st.button(f"📍 前往 {place.split()[0]}", use_container_width=True):
-                st.session_state.current_loc = place
-
-    st.markdown("---")
-
-    # ----------------------------------------
-    # 4. 取得當前坐標、頭像與描述
-    # ----------------------------------------
-    target_pos = LANDMARKS[st.session_state.current_loc]
-    # 使用你在 session state 初始化時嘅用戶暱稱同avatar style
     my_p = st.session_state.user_profile
-    avatar_url = f"https://api.dicebear.com/7.x/{my_p['avatar_style']}/svg?seed={urllib.parse.quote(my_p['nickname'])}"
+    avatar_url = f"https://api.dicebear.com/7.x/{my_p.get('avatar_style', 'adventurer')}/svg?seed={urllib.parse.quote(my_p.get('nickname', '窮遊俠'))}"
 
     # ----------------------------------------
-    # 5. 【核心技術】用 HTML/CSS 渲染地圖與絲滑會行路的人頭仔
+    # 🖼️ 5. 終極 HTML/CSS/JavaScript 一體化絲滑畫布
     # ----------------------------------------
-    # （提示：如果你想用啱啱上傳嗰張超靚手繪地圖，請將最頂部改為 "image_456467.jpg"）
-    
-    map_src = f"data:image/jpeg;base64,{map_base64}" if map_base64 else ""
-    # 副圖預留位置
+    map_src = f"data:image/png;base64,{map_base64}" if map_base64 else ""
     sub_map_src = f"data:image/png;base64,{sub_base64}" if sub_base64 else ""
 
-    # transition: left 1.5s ease-in-out, top 1.5s ease-in-out; 呢行就是讓它「行路」的魔法
-    map_html = f"""
-    <div style="position: relative; width: 100%; max-width: 900px; margin: 0 auto; overflow: hidden; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);">
-        
-        <img src="{map_src}" style="width: 100%; display: block; height: auto;" />
-        
-        <img src="{sub_map_src}" style="position: absolute; left: 0; top: 0; width: 100%; height: auto; z-index: 2; pointer-events: none;" />
+    # 將完整的 LANDMARKS 轉換成 JavaScript 字典，等前端 JS 可以完全自由操控彈窗
+    import json
+    js_landmarks_data = json.dumps(LANDMARKS, ensure_ascii=False)
 
-        <div style="
-            position: absolute; 
-            left: {target_pos['x']}%; 
-            top: {target_pos['y']}%; 
-            transform: translate(-50%, -100%); 
-            transition: left 1.5s ease-in-out, top 1.5s ease-in-out;
-            z-index: 999;
-            text-align: center;
+    map_html = f"""
+    <div style="position: relative; width: 100%; max-width: 800px; aspect-ratio: 1 / 1; margin: 0 auto; overflow: visible; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+        
+        <img src="{map_src}" style="width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 16px;" />
+        
+        {f'<img src="{sub_map_src}" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; z-index: 2; pointer-events: none;" />' if sub_base64 else ''}
+
+        <div id="markers-container"></div>
+
+        <div id="popup-card" style="
+            position: absolute;
+            width: 320px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 12px 36px rgba(15, 23, 42, 0.15);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            z-index: 9999;
+            display: none; /* 初始隱藏 */
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
         ">
-            <div style="position: relative; width: 50px; height: 50px;">
-                <img src="{avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; border: 3px solid #3b82f6; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.3);" />
-                <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); color: #3b82f6; font-size: 16px; animation: bounce 1s infinite;">👇</div>
+            <div onclick="closePopup()" style="position: absolute; right: 16px; top: 16px; color: #94a3b8; font-size: 14px; cursor: pointer; font-weight: bold; width: 22px; height: 22px; text-align: center; line-height: 22px; border-radius: 50%; background: #f1f5f9;">✕</div>
+            
+            <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                <div id="pop-icon" style="font-size: 24px; background: #ffebe6; width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">🐼</div>
+                <div style="padding-right: 20px;">
+                    <h4 id="pop-title" style="margin: 0; font-size: 17px; color: #0f172a; font-weight: 700;">海洋公園</h4>
+                    <div id="pop-eng" style="font-size: 11px; color: #64748b; margin-top: 1px;">Ocean Park · 香港島</div>
+                </div>
             </div>
-            <div style="background: rgba(0, 0, 0, 0.75); color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; white-space: nowrap; margin-top: 4px; font-weight: bold;">
-                {my_p['nickname']} (正在前進...)
+            
+            <p id="pop-desc" style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0 0 12px 0;">世界級主題公園...</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 10px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: flex-start; font-size: 12px; color: #334155;">
+                    <span style="width: 20px;">🕒</span>
+                    <div style="flex: 1;"><span style="color: #64748b;">營業時間：</span><span id="pop-time" style="color: #0f172a;">10:00-19:00</span></div>
+                </div>
+                <div style="display: flex; align-items: flex-start; font-size: 12px; color: #334155;">
+                    <span style="width: 20px;">🚇</span>
+                    <div style="flex: 1;"><span style="color: #64748b;">交通方式：</span><span id="pop-transport" style="color: #2563eb; font-weight: 500;">地鐵站</span></div>
+                </div>
+                <div style="display: flex; align-items: flex-start; font-size: 11px; color: #166534; background: #f0fdf4; padding: 6px 10px; border-radius: 8px; border-left: 3px solid #22c55e;">
+                    <span style="width: 18px;">💡</span>
+                    <div id="pop-tips" style="flex: 1;">小貼士...</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <div id="btn-add-itinerary" style="flex: 1; background: #ff4d4d; color: white; text-align: center; padding: 8px 0; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(255,77,77,0.25);">
+                    📍 加入行程
+                </div>
+                <div id="btn-stamp" style="flex: 1; background: transparent; color: #ff4d4d; border: 1px solid #ff4d4d; text-align: center; padding: 7px 0; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                    📍 打卡
+                </div>
+            </div>
+        </div>
+
+        <div id="user-avatar" style="
+            position: absolute; 
+            left: 50%; 
+            top: 50%; 
+            transform: translate(-50%, -100%); 
+            transition: left 1s cubic-bezier(0.25, 1, 0.5, 1), top 1s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 995;
+            text-align: center;
+            pointer-events: none;
+        ">
+            <div style="position: relative; width: 44px; height: 44px; margin: 0 auto;">
+                <img src="{avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; border: 3px solid #2563eb; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.25);" />
+                <div style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); color: #2563eb; font-size: 14px; animation: bounce 1s infinite;">👇</div>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.85); color: white; font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; margin-top: 3px; font-weight: bold;">
+                {my_p.get('nickname', '未命名窮遊俠')}
             </div>
         </div>
     </div>
 
+    <script>
+        const landmarks = {js_landmarks_data};
+        const selectedCategory = "{selected_cat}";
+        
+        // 渲染地圖上自訂設計嘅 Emoji 圖標
+        const container = document.getElementById('markers-container');
+        for (let name in landmarks) {{
+            const data = landmarks[name];
+            
+            // 類別篩選過濾
+            if (selectedCategory !== "全部" && data.category !== selectedCategory) continue;
+            
+            const marker = document.createElement('div');
+            marker.className = 'map-marker';
+            marker.style.position = 'absolute';
+            marker.style.left = data.x + '%';
+            marker.style.top = data.y + '%';
+            marker.style.width = '34px';
+            marker.style.height = '34px';
+            marker.style.borderRadius = '50%';
+            marker.style.backgroundColor = 'white';
+            marker.style.border = '1px solid #cbd5e1';
+            marker.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+            marker.style.display = 'flex';
+            marker.style.alignItems = 'center';
+            marker.style.justifyContent = 'center';
+            marker.style.fontSize = '18px';
+            marker.style.cursor = 'pointer';
+            marker.style.transform = 'translate(-50%, -50%)';
+            marker.style.transition = 'all 0.2s ease';
+            marker.style.zIndex = '10';
+            marker.innerHTML = data.icon;
+            marker.title = name;
+            
+            // 點擊圖標：原地彈卡片 + 人仔跑過來
+            marker.onclick = function(e) {{
+                e.stopPropagation();
+                openPopup(name);
+            }};
+            
+            container.appendChild(marker);
+        }}
+        
+        // 打開原地彈窗函數
+        function openPopup(name) {{
+            const data = landmarks[name];
+            const card = document.getElementById('popup-card');
+            const avatar = document.getElementById('user-avatar');
+            
+            // 1. 讓虛擬人仔移動到該圖標坐標 (絲滑行路效果保留)
+            avatar.style.left = data.x + '%';
+            avatar.style.top = data.y + '%';
+            
+            // 2. 填充卡片內容
+            document.getElementById('pop-icon').innerHTML = data.icon;
+            document.getElementById('pop-title').innerHTML = name;
+            document.getElementById('pop-eng').innerHTML = data.eng;
+            document.getElementById('pop-desc').innerHTML = data.desc;
+            document.getElementById('pop-time').innerHTML = data.time;
+            document.getElementById('pop-transport').innerHTML = data.transport;
+            document.getElementById('pop-tips').innerHTML = "💡 小貼士：" + data.tips;
+            
+            // 3. 計算彈窗原地浮現位置 (防溢出算法)
+            let pLeft = data.x + 3;
+            let pTop = data.y - 4;
+            if (pLeft > 65) pLeft = data.x - 43; // 太右邊就彈左邊
+            if (pTop < 25) pTop = data.y + 4;   // 太上面就彈下面
+            
+            card.style.left = pLeft + '%';
+            card.style.top = pTop + '%';
+            
+            // 4. 顯示卡片 (零重整、超流暢)
+            card.style.display = 'block';
+            setTimeout(() => {{ card.style.opacity = '1'; }}, 10);
+            
+            // 5. 按鈕綁定底層 Streamlit 同步功能 (點擊時透過隱藏 input 通知 Python)
+            document.getElementById('btn-add-itinerary').onclick = function() {{
+                sendToStreamlit("add", name);
+            }};
+            document.getElementById('btn-stamp').onclick = function() {{
+                sendToStreamlit("stamp", name);
+            }};
+        }}
+        
+        function closePopup() {{
+            const card = document.getElementById('popup-card');
+            card.style.opacity = '0';
+            setTimeout(() => {{ card.style.display = 'none'; }}, 200);
+        }}
+        
+        // 精準對接原本功能：將數據推回給 Streamlit 處理
+        function sendToStreamlit(action, place) {{
+            const inputs = window.parent.document.querySelectorAll('input');
+            let actInput, plcInput;
+            inputs.forEach(input => {{
+                if (input.ariaLabel === "js_action") actInput = input;
+                if (input.ariaLabel === "js_place") plcInput = input;
+            }});
+            
+            if (actInput && plcInput) {{
+                actInput.value = action;
+                actInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                plcInput.value = place;
+                plcInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            }}
+        }}
+        
+        // 預設主動觸發一次海洋公園彈窗，完美對齊初始狀態
+        setTimeout(() => {{ openPopup("海洋公園"); }}, 500);
+    </script>
+
     <style>
-    @keyframes bounce {{
-        0%, 100% {{ transform: translateX(-50%) translateY(0); }}
-        50% {{ transform: translateX(-50%) translateY(-5px); }}
-    }}
+        @keyframes bounce {{
+            0%, 100% {{ transform: translateX(-50%) translateY(0); }}
+            50% {{ transform: translateX(-50%) translateY(-5px); }}
+        }}
+        .map-marker:hover {{
+            transform: translate(-50%, -50%) scale(1.25) !important;
+            box-shadow: 0 0 15px #2563eb !important;
+            border-color: #2563eb !important;
+            z-index: 100 !important;
+        }}
     </style>
     """
 
-    # 將網頁畫布渲染到 Streamlit 頁面上
-    st.components.v1.html(map_html, height=550)
-
+    # 渲染全新升級的自訂畫布
+    st.components.v1.html(map_html, height=830, scrolling=False)
 # ==========================================
 # ✈️ Tab 2: 智能行程功能（已完美修復高德純文字行程規劃）
 # ==========================================
