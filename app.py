@@ -5,6 +5,31 @@ from streamlit_folium import st_folium
 from folium import Popup
 import json
 import urllib.parse
+import base64  # 🌟 確保加咗呢行，解碼圖片必備
+
+# ==========================================
+# 🛠️ 核心工具：將本地圖片轉成網頁睇得明嘅 Base64 格式
+# （必須擺喺最頂，等下面呼叫佢嗰陣 Python 已經認得佢）
+# ==========================================
+def get_base64_encoded_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode('utf-8')
+
+# ==========================================
+# 🗺️ 圖片物資載入
+# ==========================================
+# 1. 🎯 主地圖底圖
+# （提示：如果你想用啱啱上傳嗰張超靚手繪地圖，請將下面改為 "image_456467.jpg"）
+MAP_IMAGE_NAME = "mapries地圖.png" 
+map_base64 = get_base64_encoded_image(MAP_IMAGE_NAME)
+
+# 2. 🛡️ 副圖預留位置（加了 try-except 保護，暫時冇副圖都唔會死機）
+SUB_IMAGE_NAME = "sub_layer.png" 
+try:
+    sub_base64 = get_base64_encoded_image(SUB_IMAGE_NAME)
+except Exception:
+    sub_base64 = "" # 暫時未有副圖時，網頁會安全跳過中層
+
 
 # ==================== 頁面基本設定 ====================
 st.set_page_config(page_title="Un-Tourist 地道窮遊導航平台", page_icon="🌏", layout="wide")
@@ -50,120 +75,96 @@ except:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🗺️ 實時社交地圖", "✈️ 智能行程", "👥 窮遊社群", "🧾 清單小貼士", "ℹ️ 關於平台"])
 
 # ==========================================
-# 🗺️ Tab 1: 實時社交地圖功能
+# 🗺️ Tab 1: 實時尋寶地圖 (全新 H5 畫布絲滑行路版)
 # ==========================================
 with tab1:
-    st.header("🗺️ 手繪風實時尋寶地圖")
-    st.write("探索香港隱藏景點，並喺地圖上與其他在線窮遊俠實時互動！")
-    
-    # 預設景點數據
-    data = {
-        "自然": [
-            {"name": "下白泥", "coords": [22.45, 113.95], "desc": "全港最靚日落海岸。", "hours": "全日開放"},
-            {"name": "石澳", "coords": [22.23, 114.25], "desc": "前後灘 + 情人橋。", "hours": "全日開放"},
-            {"name": "淺水灣", "coords": [22.23, 114.20], "desc": "著名海灘，適合游泳。", "hours": "全日開放"},
-        ],
-        "文化": [
-            {"name": "天壇大佛", "coords": [22.254, 113.905], "desc": "香港最大戶外青銅佛像。", "hours": "每日 10:00-17:30"},
-            {"name": "黃大仙", "coords": [22.34, 114.19], "desc": "著名求簽廟宇。", "hours": "每日 7:00-17:30"},
-        ],
-        "娛樂": [
-            {"name": "迪士尼樂園", "coords": [22.313, 114.043], "desc": "奇妙夢想城堡與童話世界。", "hours": "視乎官方季節"},
-            {"name": "海洋公園", "coords": [22.246, 114.175], "desc": "依山而建的經典主題樂園。", "hours": "視乎官方季節"},
-        ]
+    st.header("🗺️ 手繪風動態尋寶地圖")
+    st.write("點擊下方景點按鈕，你的人仔就會在手繪圖畫布上絲滑前進！")
+
+    # ----------------------------------------
+    # 📌 定義手繪地圖上各個地標的坐標百分比 (X, Y)
+    # （對應你張手繪圖，你可以自己調整數值）
+    # ----------------------------------------
+    LANDMARKS = {
+        "中環 (Central)": {"x": 52, "y": 66},
+        "長洲 (Cheung Chau)": {"x": 30, "y": 80},
+        "大澳漁村 (Tai O)": {"x": 9, "y": 65},
+        "天壇大佛 (Big Buddha)": {"x": 24, "y": 50},
+        "迪士尼樂園 (Disneyland)": {"x": 32, "y": 40},
+        "旺角 (Mong Kok)": {"x": 56, "y": 40},
+        "黃大仙廟 (Wong Tai Sin)": {"x": 70, "y": 30},
+        "西貢 (Sai Kung)": {"x": 86, "y": 26}
     }
-    
-    main_cat = st.selectbox("篩選景點類別", options=list(data.keys()))
-    spots = data[main_cat]
-    
-    # 創建基礎 Folium 地圖
-    m = folium.Map(location=[22.3193, 114.1694], zoom_start=11)
-    
-    # 1. 渲染傳統景點標記
-    for spot in spots:
-        popup_html = f"""
-        <div style='background:white; padding:12px; border-radius:8px; min-width:200px;'>
-            <b>{spot['name']}</b><br>
-            {spot['desc']}<br>
-            <small><b>開放時間：</b>{spot['hours']}</small>
-        </div>
-        """
-        folium.Marker(
-            location=spot["coords"],
-            popup=Popup(popup_html, max_width=260),
-            tooltip=spot["name"]
-        ).add_to(m)
-        
-    # 2. 渲染其他在線用戶的虛擬人仔 (NPC/Mock Data)
-    for other in st.session_state.mock_users:
-        other_icon_html = f"""
-        <div style='position: relative; width: 42px; height: 42px;'>
-            <img src='{other['avatar']}' style='width:40px; height:40px; border-radius:50%; border:2px solid #ef4444; background:white; box-shadow: 0px 2px 6px rgba(0,0,0,0.3);'>
-            <div style='position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; white-space: nowrap;'>
-                {other['nickname']}
-            </div>
-        </div>
-        """
-        folium.Marker(
-            location=other["coords"],
-            icon=folium.DivIcon(html=other_icon_html, icon_size=(40, 40), icon_anchor=(20, 20)),
-            popup=other['nickname']
-        ).add_to(m)
 
-    # 3. 渲染用戶自己的人仔（如果開啟了位置分享）
-    if st.session_state.user_profile["is_sharing"]:
-        my_p = st.session_state.user_profile
-        my_avatar_url = f"https://api.dicebear.com/7.x/{my_p['avatar_style']}/svg?seed={urllib.parse.quote(my_p['nickname'])}"
-        
-        my_icon_html = f"""
-        <div style='position: relative; width: 46px; height: 46px;'>
-            <img src='{my_avatar_url}' style='width:44px; height:44px; border-radius:50%; border:3px solid #3b82f6; background:white; box-shadow: 0px 2px 8px rgba(59,130,246,0.5);'>
-            <div style='position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; white-space: nowrap;'>
-                🌟 你的位置 ({my_p['nickname']})
-            </div>
-        </div>
-        """
-        folium.Marker(
-            location=[my_p["lat"], my_p["lng"]],
-            icon=folium.DivIcon(html=my_icon_html, icon_size=(44, 44), icon_anchor=(22, 22)),
-            popup="你目前的位置"
-        ).add_to(m)
+    # 初始化人仔位置 (預設在中環)
+    if "current_loc" not in st.session_state:
+        st.session_state.current_loc = "中環 (Central)"
 
-    # 顯示地圖
-    st_folium(m, width="100%", height=500)
-    
+    # ----------------------------------------
+    # 3. 讓用戶點擊按鈕切換目的地
+    # ----------------------------------------
+    col_btns = st.columns(4)
+    for idx, place in enumerate(LANDMARKS.keys()):
+        with col_btns[idx % 4]:
+            if st.button(f"📍 前往 {place.split()[0]}", use_container_width=True):
+                st.session_state.current_loc = place
+
     st.markdown("---")
-    st.subheader("📌 快速加入行程或蓋章打卡")
+
+    # ----------------------------------------
+    # 4. 取得當前坐標、頭像與描述
+    # ----------------------------------------
+    target_pos = LANDMARKS[st.session_state.current_loc]
+    # 使用你在 session state 初始化時嘅用戶暱稱同avatar style
+    my_p = st.session_state.user_profile
+    avatar_url = f"https://api.dicebear.com/7.x/{my_p['avatar_style']}/svg?seed={urllib.parse.quote(my_p['nickname'])}"
+
+    # ----------------------------------------
+    # 5. 【核心技術】用 HTML/CSS 渲染地圖與絲滑會行路的人頭仔
+    # ----------------------------------------
+    # （提示：如果你想用啱啱上傳嗰張超靚手繪地圖，請將最頂部改為 "image_456467.jpg"）
     
-    day_options = list(st.session_state.itinerary.keys())
-    selected_day = st.selectbox("選擇要加入嘅日子", options=day_options if day_options else ["Day 1"])
-    
-    for spot in spots:
-        with st.expander(f"{spot['name']}"):
-            st.write(spot['desc'])
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"加入 {selected_day}", key=f"add_{main_cat}_{spot['name']}"):
-                    if selected_day not in st.session_state.itinerary:
-                        st.session_state.itinerary[selected_day] = []
-                    
-                    if any(s["name"] == spot['name'] for s in st.session_state.itinerary[selected_day]):
-                        st.warning(f"「{spot['name']}」已經喺 {selected_day} 入面")
-                    else:
-                        st.session_state.itinerary[selected_day].append({"name": spot['name'], "time": "12:00"})
-                        st.success(f"✅ 已將「{spot['name']}」加入 {selected_day}")
-                        st.rerun()
-            with col2:
-                if st.button(f"📍 蓋章打卡", key=f"stamp_{main_cat}_{spot['name']}"):
-                    if not any(s["name"] == spot['name'] for s in st.session_state.stamp_collection):
-                        st.session_state.stamp_collection.append({
-                            "name": spot['name'],
-                            "time": datetime.now().strftime("%Y-%m-%d %H:%M")
-                        })
-                        st.success(f"🎉 成功蓋章「{spot['name']}」！")
-                        st.rerun()
-                    else:
-                        st.warning("呢個景點已經打卡過囉！")
+    map_src = f"data:image/jpeg;base64,{map_base64}" if map_base64 else ""
+    # 副圖預留位置
+    sub_map_src = f"data:image/png;base64,{sub_base64}" if sub_base64 else ""
+
+    # transition: left 1.5s ease-in-out, top 1.5s ease-in-out; 呢行就是讓它「行路」的魔法
+    map_html = f"""
+    <div style="position: relative; width: 100%; max-width: 900px; margin: 0 auto; overflow: hidden; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);">
+        
+        <img src="{map_src}" style="width: 100%; display: block; height: auto;" />
+        
+        <img src="{sub_map_src}" style="position: absolute; left: 0; top: 0; width: 100%; height: auto; z-index: 2; pointer-events: none;" />
+
+        <div style="
+            position: absolute; 
+            left: {target_pos['x']}%; 
+            top: {target_pos['y']}%; 
+            transform: translate(-50%, -100%); 
+            transition: left 1.5s ease-in-out, top 1.5s ease-in-out;
+            z-index: 999;
+            text-align: center;
+        ">
+            <div style="position: relative; width: 50px; height: 50px;">
+                <img src="{avatar_url}" style="width: 100%; height: 100%; border-radius: 50%; border: 3px solid #3b82f6; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.3);" />
+                <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); color: #3b82f6; font-size: 16px; animation: bounce 1s infinite;">👇</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.75); color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; white-space: nowrap; margin-top: 4px; font-weight: bold;">
+                {my_p['nickname']} (正在前進...)
+            </div>
+        </div>
+    </div>
+
+    <style>
+    @keyframes bounce {{
+        0%, 100% {{ transform: translateX(-50%) translateY(0); }}
+        50% {{ transform: translateX(-50%) translateY(-5px); }}
+    }}
+    </style>
+    """
+
+    # 將網頁畫布渲染到 Streamlit 頁面上
+    st.components.v1.html(map_html, height=550)
 
 # ==========================================
 # ✈️ Tab 2: 智能行程功能（已完美修復高德純文字行程規劃）
